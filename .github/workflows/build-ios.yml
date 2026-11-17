@@ -1,0 +1,60 @@
+name: Build iOS Unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build Unsigned IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive unsigned Release build
+        run: |
+          mkdir -p build
+          xcodebuild archive \
+            -project InseegoManager.xcodeproj \
+            -scheme InseegoManager \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath build/InseegoManager.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Package Unsigned .ipa
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/InseegoManager.xcarchive/Products/Applications/InseegoManager.app build/ipa/Payload/
+          cd build/ipa
+          zip -r -y ../InseegoManager.ipa Payload
+          ls -lh ../InseegoManager.ipa
+
+      - name: Upload Unsigned IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InseegoManager-ipa
+          path: build/InseegoManager.ipa
+          if-no-files-found: error

@@ -1,0 +1,57 @@
+name: InseegoManager
+options:
+  bundleIdPrefix: com.inseegomanager
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    PRODUCT_NAME: InseegoManager
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SUPPORTS_MACCATALYST: NO
+
+targets:
+  InseegoManager:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: InseegoManager
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.inseegomanager.ios
+        INFOPLIST_KEY_CFBundleDisplayName: "Inseego Manager"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "Ứng dụng cần quyền mạng nội bộ để kết nối tới bộ phát Wi-Fi Inseego (ví dụ 192.168.1.1)."
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+    info:
+      path: InseegoManager/Info.plist
+      properties:
+        CFBundleDisplayName: "Inseego Manager"
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        NSLocalNetworkUsageDescription: "Ứng dụng cần quyền mạng nội bộ để kết nối tới bộ phát Wi-Fi Inseego (ví dụ 192.168.1.1)."
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        UILaunchScreen: {}
+schemes:
+  InseegoManager:
+    build:
+      targets:
+        InseegoManager: all
+    archive:
+      config: Release
