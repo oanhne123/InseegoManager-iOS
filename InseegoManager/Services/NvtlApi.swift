@@ -172,9 +172,11 @@ final class NvtlApi {
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         if let timeout { req.timeoutInterval = timeout }
+        session.applyCookies(to: &req)
 
         do {
             let (data, resp) = try await session.normalSession.data(for: req)
+            session.captureCookies(from: resp)
             let http = resp as? HTTPURLResponse
             let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
             let finalUrl = resp.url?.absoluteString ?? url.absoluteString
@@ -208,17 +210,19 @@ final class NvtlApi {
         if let referer {
             req.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
         }
+        session.applyCookies(to: &req)
 
         let client = useLongTimeout ? session.longSession : session.normalSession
         do {
             let (data, resp) = try await client.data(for: req)
+            session.captureCookies(from: resp)
             let http = resp as? HTTPURLResponse
             let code = http?.statusCode ?? 0
             let body = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
             let finalUrl = resp.url?.absoluteString ?? url.absoluteString
             if !quiet {
                 DebugLog.shared.add("POST \(url.path) -> \(code)",
-                                    "Body gửi: \(maskPairs(pairs))\nPhản hồi: \(sanitize(body))")
+                                    "Cookie: \(session.cookieDebugSummary)\nBody gửi: \(maskPairs(pairs))\nPhản hồi: \(sanitize(body))")
             }
             return RawResponse(code: code, finalUrl: finalUrl, body: body)
         } catch {
@@ -372,7 +376,7 @@ final class NvtlApi {
         }
 
         let (secret, formula) = Self.secretFor(password: password, html: loginPage.html, secToken: secToken)
-        DebugLog.shared.add("Đăng nhập", "Công thức: \(formula)")
+        DebugLog.shared.add("Đăng nhập", "Công thức: \(formula) | Cookie: \(session.cookieDebugSummary) | gToken: \(gToken.prefix(8))...")
 
         let candidates = await loginSubmitCandidates(session: session, loginPage: loginPage)
         guard let loginUrl = URL(string: loginPage.finalUrl) else {
