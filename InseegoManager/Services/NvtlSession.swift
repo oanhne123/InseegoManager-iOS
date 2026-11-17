@@ -19,6 +19,7 @@ final class NvtlSession {
         let normalConfig = URLSessionConfiguration.ephemeral
         normalConfig.httpCookieStorage = nil
         normalConfig.httpShouldSetCookies = false
+        normalConfig.httpMaximumConnectionsPerHost = 2
         normalConfig.timeoutIntervalForRequest = 15
         normalConfig.timeoutIntervalForResource = 20
         normalConfig.httpAdditionalHeaders = ["User-Agent": userAgent]
@@ -28,6 +29,7 @@ final class NvtlSession {
         let longConfig = URLSessionConfiguration.ephemeral
         longConfig.httpCookieStorage = nil
         longConfig.httpShouldSetCookies = false
+        longConfig.httpMaximumConnectionsPerHost = 2
         longConfig.timeoutIntervalForRequest = 100
         longConfig.timeoutIntervalForResource = 110
         longConfig.httpAdditionalHeaders = ["User-Agent": userAgent]

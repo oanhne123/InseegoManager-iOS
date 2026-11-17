@@ -166,24 +166,46 @@ final class NvtlApi {
         return String(clean.prefix(maxLen)) + "..."
     }
 
+    private func isTransientSocketError(_ error: Error) -> Bool {
+        if Task.isCancelled { return false }
+        let nsErr = error as NSError
+        if nsErr.domain == NSURLErrorDomain {
+            return nsErr.code == NSURLErrorCancelled ||
+                   nsErr.code == NSURLErrorNetworkConnectionLost ||
+                   nsErr.code == NSURLErrorTimedOut
+        }
+        return false
+    }
+
     private func fetchPage(session: NvtlSession, pathOrUrl: String, timeout: TimeInterval? = nil) async throws -> PageResponse {
         let base = try baseURL(for: session.ip)
         let url = try resolveURL(base: base, pathOrUrl: pathOrUrl)
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        if let timeout { req.timeoutInterval = timeout }
-        session.applyCookies(to: &req)
 
-        do {
-            let (data, resp) = try await session.normalSession.data(for: req)
-            session.captureCookies(from: resp)
-            let http = resp as? HTTPURLResponse
-            let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
-            let finalUrl = resp.url?.absoluteString ?? url.absoluteString
-            return PageResponse(code: http?.statusCode ?? 0, finalUrl: finalUrl, html: html)
-        } catch {
-            throw NvtlError.api("Không kết nối được tới \(url.absoluteString): \(error.localizedDescription)")
+        for attempt in 0..<2 {
+            var req = URLRequest(url: url)
+            req.httpMethod = "GET"
+            if let timeout { req.timeoutInterval = timeout }
+            session.applyCookies(to: &req)
+
+            do {
+                let (data, resp) = try await session.normalSession.data(for: req)
+                session.captureCookies(from: resp)
+                let http = resp as? HTTPURLResponse
+                let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+                let finalUrl = resp.url?.absoluteString ?? url.absoluteString
+                return PageResponse(code: http?.statusCode ?? 0, finalUrl: finalUrl, html: html)
+            } catch {
+                if error is CancellationError || Task.isCancelled {
+                    throw error
+                }
+                if attempt == 0 && isTransientSocketError(error) {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    continue
+                }
+                throw NvtlError.api("Không kết nối được tới \(url.absoluteString): \(error.localizedDescription)")
+            }
         }
+        throw NvtlError.api("Không kết nối được tới \(url.absoluteString)")
     }
 
     private func postForm(
@@ -195,42 +217,53 @@ final class NvtlApi {
         quiet: Bool = false,
         useLongTimeout: Bool = false
     ) async throws -> RawResponse {
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.httpBody = formEncode(pairs)
-        req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
-        if xmlHttpRequest {
-            req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
-        }
-        let base = try baseURL(for: session.ip)
-        if let scheme = base.scheme, let host = base.host {
-            let portPart = base.port.map { ":\($0)" } ?? ""
-            req.setValue("\(scheme)://\(host)\(portPart)", forHTTPHeaderField: "Origin")
-        }
-        if let referer {
-            req.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
-        }
-        session.applyCookies(to: &req)
-
         let client = useLongTimeout ? session.longSession : session.normalSession
-        do {
-            let (data, resp) = try await client.data(for: req)
-            session.captureCookies(from: resp)
-            let http = resp as? HTTPURLResponse
-            let code = http?.statusCode ?? 0
-            let body = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
-            let finalUrl = resp.url?.absoluteString ?? url.absoluteString
-            if !quiet {
-                DebugLog.shared.add("POST \(url.path) -> \(code)",
-                                    "Cookie: \(session.cookieDebugSummary)\nBody gửi: \(maskPairs(pairs))\nPhản hồi: \(sanitize(body))")
+
+        for attempt in 0..<2 {
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.httpBody = formEncode(pairs)
+            req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
+            if xmlHttpRequest {
+                req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
             }
-            return RawResponse(code: code, finalUrl: finalUrl, body: body)
-        } catch {
-            if !quiet {
-                DebugLog.shared.add("POST \(url.path) -> Lỗi", error.localizedDescription)
+            let base = try baseURL(for: session.ip)
+            if let scheme = base.scheme, let host = base.host {
+                let portPart = base.port.map { ":\($0)" } ?? ""
+                req.setValue("\(scheme)://\(host)\(portPart)", forHTTPHeaderField: "Origin")
             }
-            throw NvtlError.api("Lỗi kết nối khi gửi tới \(url.path): \(error.localizedDescription)")
+            if let referer {
+                req.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
+            }
+            session.applyCookies(to: &req)
+
+            do {
+                let (data, resp) = try await client.data(for: req)
+                session.captureCookies(from: resp)
+                let http = resp as? HTTPURLResponse
+                let code = http?.statusCode ?? 0
+                let body = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+                let finalUrl = resp.url?.absoluteString ?? url.absoluteString
+                if !quiet {
+                    DebugLog.shared.add("POST \(url.path) -> \(code)",
+                                        "Cookie: \(session.cookieDebugSummary)\nBody gửi: \(maskPairs(pairs))\nPhản hồi: \(sanitize(body))")
+                }
+                return RawResponse(code: code, finalUrl: finalUrl, body: body)
+            } catch {
+                if error is CancellationError || Task.isCancelled {
+                    throw error
+                }
+                if attempt == 0 && isTransientSocketError(error) {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    continue
+                }
+                if !quiet {
+                    DebugLog.shared.add("POST \(url.path) -> Lỗi", error.localizedDescription)
+                }
+                throw NvtlError.api("Lỗi kết nối khi gửi tới \(url.path): \(error.localizedDescription)")
+            }
         }
+        throw NvtlError.api("Lỗi kết nối khi gửi tới \(url.path)")
     }
 
     // MARK: - Token & JSON Helpers

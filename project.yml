@@ -10,8 +10,8 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_STRICT_CONCURRENCY: minimal
     PRODUCT_NAME: InseegoManager
-    MARKETING_VERSION: "1.0.1"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "1.0.2"
+    CURRENT_PROJECT_VERSION: "3"
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: NO
 
@@ -41,8 +41,8 @@ targets:
       path: InseegoManager/Info.plist
       properties:
         CFBundleDisplayName: "Inseego Manager"
-        CFBundleShortVersionString: "1.0.1"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "1.0.2"
+        CFBundleVersion: "3"
         NSLocalNetworkUsageDescription: "Ứng dụng cần quyền mạng nội bộ để kết nối tới bộ phát Wi-Fi Inseego (ví dụ 192.168.1.1)."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

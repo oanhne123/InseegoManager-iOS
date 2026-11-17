@@ -59,6 +59,13 @@ struct DashboardView: View {
         .refreshable {
             await appVM.refreshDashboard()
         }
+        .task(id: appVM.isLiveEnabled) {
+            guard appVM.isLiveEnabled else { return }
+            while !Task.isCancelled && appVM.isLoggedIn && appVM.isLiveEnabled {
+                await appVM.refreshTelemetryOnly()
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
         .confirmationDialog("Khởi động lại thiết bị?", isPresented: $confirmRestart, titleVisibility: .visible) {
             Button("Khởi động lại ngay", role: .destructive) {
                 Task { await appVM.powerAction(.restart) }
@@ -87,6 +94,31 @@ struct DashboardView: View {
                 Text("IP: \(appVM.session?.ip ?? "—") • \(appVM.signal?.carrier.isEmpty == false ? appVM.signal!.carrier : "Đang đọc nhà mạng")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Button {
+                        appVM.isLiveEnabled.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(appVM.isLiveEnabled ? Color.green : Color.gray)
+                                .frame(width: 7, height: 7)
+                            Text(appVM.isLiveEnabled ? "Live 3s" : "Đã tạm dừng")
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background((appVM.isLiveEnabled ? Color.green : Color.gray).opacity(0.12))
+                        .foregroundStyle(appVM.isLiveEnabled ? .green : .secondary)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    if let updated = appVM.lastUpdated {
+                        Text(updated, style: .time)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             Spacer()

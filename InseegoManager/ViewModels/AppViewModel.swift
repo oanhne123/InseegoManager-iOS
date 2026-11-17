@@ -11,10 +11,14 @@ final class AppViewModel: ObservableObject {
     @Published var dataUsage: DataUsage?
     @Published var radio5gEnabled: Bool?
 
+    @Published var isLiveEnabled = true
+    @Published var lastUpdated: Date?
     @Published var isBusy = false
     @Published var statusMessage: String?
     @Published var alertTitle: String?
     @Published var alertMessage: String?
+
+    private var isRefreshing = false
 
     var isLoggedIn: Bool { session != nil }
 
@@ -27,30 +31,56 @@ final class AppViewModel: ObservableObject {
         self.identity = newSession.identity
         KeychainStore.lastIp = newSession.ip
         Task {
-            await refreshDashboard()
+            await refreshDashboard(silent: true)
         }
     }
 
-    func refreshDashboard() async {
-        guard let session else { return }
-        isBusy = true
-        defer { isBusy = false }
+    func refreshDashboard(silent: Bool = false) async {
+        guard let session, !isRefreshing else { return }
+        isRefreshing = true
+        if !silent { isBusy = true }
+        defer {
+            isRefreshing = false
+            if !silent { isBusy = false }
+        }
 
         do {
-            async let idTask = NvtlApi.shared.getDeviceIdentity(session: session)
-            async let sigTask = NvtlApi.shared.getSignal(session: session)
-            async let nrTask = NvtlApi.shared.getNrInfo(session: session)
-            async let tempTask = NvtlApi.shared.getTemperature(session: session)
-            async let dataTask = NvtlApi.shared.getDataUsage(session: session)
-
-            self.identity = try await idTask
-            self.signal = try await sigTask
-            self.nrInfo = try? await nrTask
-            self.tempInfo = try? await tempTask
-            self.dataUsage = try? await dataTask
-            self.radio5gEnabled = try? await NvtlApi.shared.getRadio5gEnabled(session: session)
+            if self.identity == nil {
+                self.identity = try await NvtlApi.shared.getDeviceIdentity(session: session)
+            }
+            self.signal = try await NvtlApi.shared.getSignal(session: session)
+            self.nrInfo = try? await NvtlApi.shared.getNrInfo(session: session)
+            self.tempInfo = try? await NvtlApi.shared.getTemperature(session: session)
+            self.dataUsage = try? await NvtlApi.shared.getDataUsage(session: session)
+            if self.radio5gEnabled == nil {
+                self.radio5gEnabled = try? await NvtlApi.shared.getRadio5gEnabled(session: session)
+            }
+            self.lastUpdated = Date()
         } catch {
-            handleError(error)
+            if error is CancellationError || Task.isCancelled { return }
+            if !silent {
+                handleError(error)
+            } else if case NvtlError.sessionExpired = error {
+                handleError(error)
+            }
+        }
+    }
+
+    func refreshTelemetryOnly() async {
+        guard let session, !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            self.signal = try await NvtlApi.shared.getSignal(session: session)
+            self.nrInfo = try? await NvtlApi.shared.getNrInfo(session: session)
+            self.tempInfo = try? await NvtlApi.shared.getTemperature(session: session)
+            self.dataUsage = try? await NvtlApi.shared.getDataUsage(session: session)
+            self.lastUpdated = Date()
+        } catch {
+            if case NvtlError.sessionExpired = error {
+                handleError(error)
+            }
         }
     }
 
@@ -83,9 +113,11 @@ final class AppViewModel: ObservableObject {
         tempInfo = nil
         dataUsage = nil
         radio5gEnabled = nil
+        lastUpdated = nil
     }
 
     func handleError(_ error: Error) {
+        if error is CancellationError || Task.isCancelled { return }
         if case NvtlError.sessionExpired = error {
             alertTitle = "Hết phiên đăng nhập"
             alertMessage = error.localizedDescription
