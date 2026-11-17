@@ -764,7 +764,7 @@ final class NvtlApi {
     func getNrBands(session: NvtlSession) async throws -> NrBands? {
         let base = try baseURL(for: session.ip)
         let url = try resolveURL(base: base, pathOrUrl: "/cgi/nr5gband.cgi")
-        let raw = try await postForm(session: session, url: url, params: [("action", "get")], xmlHttpRequest: true, referer: base, useLongTimeout: true)
+        let raw = try await postForm(session: session, url: url, pairs: [("action", "get")], xmlHttpRequest: true, referer: base, useLongTimeout: true)
         if raw.code == 401 || raw.code == 403 { throw NvtlError.sessionExpired }
 
         if (200..<300).contains(raw.code), let r = jsonObject(raw.body), boolVal(r, "ok") == true {
@@ -780,7 +780,7 @@ final class NvtlApi {
             return nil
         }
 
-        let maskRaw = try await postForm(session: session, url: url, params: [("action", "getmask")], xmlHttpRequest: true, referer: base, useLongTimeout: true)
+        let maskRaw = try await postForm(session: session, url: url, pairs: [("action", "getmask")], xmlHttpRequest: true, referer: base, useLongTimeout: true)
         if maskRaw.code == 401 || maskRaw.code == 403 { throw NvtlError.sessionExpired }
         guard (200..<300).contains(maskRaw.code), let mr = jsonObject(maskRaw.body), boolVal(mr, "ok") == true else {
             return nil
@@ -1305,7 +1305,7 @@ final class NvtlApi {
     func getBootMode(session: NvtlSession) async throws -> Bool? {
         let base = try baseURL(for: session.ip)
         let url = try resolveURL(base: base, pathOrUrl: "/cgi/persistmode.cgi")
-        let raw = try await postForm(session: session, url: url, params: [("action", "get")], xmlHttpRequest: true, referer: base, quiet: true)
+        let raw = try await postForm(session: session, url: url, pairs: [("action", "get")], xmlHttpRequest: true, referer: base, quiet: true)
         if raw.code == 401 || raw.code == 403 { throw NvtlError.sessionExpired }
         guard (200..<300).contains(raw.code), let r = jsonObject(raw.body), boolVal(r, "ok") == true else {
             return nil
@@ -1329,8 +1329,13 @@ final class NvtlApi {
 
         let base = try baseURL(for: session.ip)
         let pageUrl = URL(string: page.finalUrl) ?? base
-        let actionUrl = (form?.action.isEmpty == false ? URL(string: form!.action, relativeTo: pageUrl)?.absoluteURL : nil)
-            ?? (try resolveURL(base: base, pathOrUrl: "/preferences/"))
+        let actionUrl: URL
+        if let formAction = form?.action, !formAction.isEmpty,
+           let resolved = URL(string: formAction, relativeTo: pageUrl)?.absoluteURL {
+            actionUrl = resolved
+        } else {
+            actionUrl = try resolveURL(base: base, pathOrUrl: "/preferences/")
+        }
 
         _ = try await postForm(session: session, url: actionUrl, pairs: pairs, xmlHttpRequest: false, referer: pageUrl)
         let verify = try await fetchPage(session: session, pathOrUrl: "/preferences/")

@@ -107,13 +107,11 @@ enum SignalSampler {
 
     static func describeRsrpQuality(_ rsrpDbm: Double?) -> String {
         guard let rsrpDbm else { return "Chưa có dữ liệu" }
-        switch rsrpDbm {
-        case -80.0...: return "Rất khỏe"
-        case -92.0...: return "Tốt"
-        case -103.0...: return "Trung bình"
-        case -112.0...: return "Yếu"
-        default: return "Rất yếu"
-        }
+        if rsrpDbm >= -80.0 { return "Rất khỏe" }
+        if rsrpDbm >= -92.0 { return "Tốt" }
+        if rsrpDbm >= -103.0 { return "Trung bình" }
+        if rsrpDbm >= -112.0 { return "Yếu" }
+        return "Rất yếu"
     }
 
     private static func formatBand(_ primary: String?, fallback: String?, suffix: String? = nil) -> String {
